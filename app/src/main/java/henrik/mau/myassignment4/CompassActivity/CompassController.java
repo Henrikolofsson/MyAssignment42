@@ -3,6 +3,7 @@ package henrik.mau.myassignment4.CompassActivity;
 
 import android.hardware.SensorManager;
 import android.util.Log;
+import android.view.animation.RotateAnimation;
 
 import java.util.Random;
 
@@ -66,33 +67,11 @@ public class CompassController {
         this.userId = userId;
     }
 
-    public void rotateCompass(float azimuthInDegrees) {
-        Log.d("SENSORORIENTDETECTED", "INSIDEROTATECONTROLLER");
-        compassFragment.rotateCompass(azimuthInDegrees);
+
+
+    public void startAnimation(RotateAnimation rotateAnimation) {
+        compassFragment.rotateCompass(rotateAnimation);
     }
 
-    public void animate(float x, float y, float z) {
-        Log.d("DEBUG", "ANIMATION START");
-        float gravityX = x / SensorManager.GRAVITY_EARTH;
-        float gravityY = y / SensorManager.GRAVITY_EARTH;
-        float gravityZ = z / SensorManager.GRAVITY_EARTH;
 
-        float gravityForce = (float) Math.sqrt((gravityX * gravityX) + (gravityY * gravityY) + (gravityZ * gravityZ));
-
-        if(gravityForce > SHAKE_THRESHOLD) {
-            final long newTimeStamp = System.currentTimeMillis();
-            if(mTimeStamp + SHAKE_SLOP_TIME_MS > newTimeStamp) {
-                return;
-            }
-            mTimeStamp = newTimeStamp;
-
-            animationFactor = rand.nextInt((5) + 1);
-            compassFragment.rotateCompass(animationFactor *  360, animationFactor * 500);
-            //compassFragment.rotateCompass(360, animationFactor * 500);
-        }
-    }
-
-    public void setPictureNorth(float angleDegree) {
-        compassFragment.setPictureNorth(angleDegree);
-    }
 }

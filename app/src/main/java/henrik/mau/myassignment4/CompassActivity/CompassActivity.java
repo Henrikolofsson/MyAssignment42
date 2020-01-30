@@ -8,6 +8,7 @@ import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.animation.RotateAnimation;
 
 import henrik.mau.myassignment4.R;
 import henrik.mau.myassignment4.StepActivity.StepController;
@@ -44,7 +45,7 @@ public class CompassActivity extends AppCompatActivity {
     }
 
     private void setCompassServiceConnection() {
-        compassServiceConnection = new CompassServiceConnection(this);
+        compassServiceConnection = new CompassServiceConnection(this, compassController);
     }
 
     public void setFragment(Fragment fragment, String tag) {
@@ -57,19 +58,6 @@ public class CompassActivity extends AppCompatActivity {
         return fragmentManager.findFragmentByTag(tag);
     }
 
-
-    public void rotateCompass(float azimuthInDegrees) {
-        Log.d("SENSORORIENTDETECTED", "INSIDEROTATEACTIVITY");
-        compassController.rotateCompass(azimuthInDegrees);
-    }
-
-    public void animate(float value, float value1, float value2) {
-        compassController.animate(value, value1, value2);
-    }
-
-    public void setPictureNorth(float angleInDegree) {
-        compassController.setPictureNorth(angleInDegree);
-    }
 
     @Override
     protected void onStart() {

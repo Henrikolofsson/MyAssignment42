@@ -10,10 +10,17 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import android.view.animation.Animation;
+import android.view.animation.RotateAnimation;
+import android.widget.Toast;
+
+import java.util.Timer;
+import java.util.TimerTask;
 
 
 public class CompassService extends Service implements SensorEventListener {
     private CompassActivity activity;
+    private CompassController controller;
     private IBinder mBinder;
 
     private SensorManager sensorManager;
@@ -28,8 +35,9 @@ public class CompassService extends Service implements SensorEventListener {
     private float[] lastMagnetometerValues = new float[3];
     private float[] orientationValues = new float[3];
     private long lastTimeUpdate = System.currentTimeMillis();
+    private float currentDegree;
 
-    private static final float SHAKE_THRESHOLD = 2.7F;
+    private static final float SHAKE_THRESHOLD = 10F;
     private static final int SHAKE_SLOP_TIME_MS = 500;
 
     private float x;
@@ -39,19 +47,33 @@ public class CompassService extends Service implements SensorEventListener {
     private float last_y;
     private float last_z;
 
+    private long lastTimeShaked = 0;
+    private long timeShaked;
+    private boolean shakeAble = true;
+
     @Override
     public void onCreate() {
         super.onCreate();
         sensorManager = (SensorManager) this.getSystemService(SENSOR_SERVICE);
+
+        //If accelerometer and magnetometer is existing in phone - IsOrientAPI is true
         if(sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null && sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) != null) {
             mAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             mMagnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
             isOrientAPI = true;
+            Log.d("SENSOR", "USING ACCELEROMETER AND MAGNETOMETER");
         }
-        if(sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION) != null) {
-            mOrient = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
-            Log.d("MORIENT", "MORIENT" + mOrient);
-            isOrientAPI = false;
+
+        //If accelerometer and magnetometer does not exist in phone - IsOrientAPI is false - It will use Orient sensor instead
+        if(!isOrientAPI) {
+            if(sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION) != null) {
+                mOrient = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
+                isOrientAPI = false;
+                Log.d("SENSOR", "USING ORIENT SENSOR");
+            }
+            else {
+                Log.d("SENSOR", "There is no accelerometer, magnetometer or orient sensor");
+            }
         }
     }
 
@@ -62,17 +84,18 @@ public class CompassService extends Service implements SensorEventListener {
         if(isOrientAPI) {
             sensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_UI);
             sensorManager.registerListener(this, mMagnetometer, SensorManager.SENSOR_DELAY_UI);
-            //sensorManager.registerListener(this, mOrient, SensorManager.SENSOR_DELAY_UI);
         } else {
-
             sensorManager.registerListener(this, mOrient, SensorManager.SENSOR_DELAY_UI);
         }
-
         return mBinder;
     }
 
     public void setListenerActivity(CompassActivity activity) {
         this.activity = activity;
+    }
+
+    public void setController(CompassController compassController) {
+        this.controller = compassController;
     }
 
     public void unregisterListener() {
@@ -88,56 +111,88 @@ public class CompassService extends Service implements SensorEventListener {
     public void onSensorChanged(SensorEvent event) {
         if(activity!= null) {
         //Using orientation api
+
+            if(isOrientAPI) {
+                if(event.sensor == mAccelerometer) {
+                    System.arraycopy(event.values, 0, lastAccelerometerValues, 0, event.values.length);
+                    lastAccelerometerSet = true;
+
+                    x = event.values[0];
+                    y = event.values[1];
+                    z = event.values[2];
+                    float deltaX = Math.abs(last_x - x);
+                    float deltaY = Math.abs(last_y - y);
+                    float deltaZ = Math.abs(last_z - z);
+
+
+                    if((deltaX > SHAKE_THRESHOLD && deltaY > SHAKE_THRESHOLD)
+                            || (deltaX > SHAKE_THRESHOLD && deltaZ > SHAKE_THRESHOLD)
+                            || (deltaY > SHAKE_THRESHOLD && deltaZ > SHAKE_THRESHOLD)) {
+                        timeShaked = System.currentTimeMillis() / 1000;
+
+                        //If 5 seconds passed since last shake, the animation can begin
+                        if(timeShaked - lastTimeShaked > 5) {
+                            rotateUsingOrientationAPI(event);
+                        }
+
+                    }
+
+                    last_x = x;
+                    last_y = y;
+                    last_z = z;
+                    lastTimeShaked = timeShaked;
+                }
+                else if(event.sensor == mMagnetometer) {
+                    System.arraycopy(event.values, 0, lastMagnetometerValues, 0, event.values.length);
+                    lastMagnetometerSet = true;
+                }
+            }
+
+            if(!isOrientAPI) {
+
+            }
+
+        }
+    }
+
+    private void rotateUsingOrientationAPI(SensorEvent event) {
         if(event.sensor == mAccelerometer) {
             System.arraycopy(event.values, 0, lastAccelerometerValues, 0, event.values.length);
             lastAccelerometerSet = true;
-
-            x = event.values[0];
-            y = event.values[1];
-            z = event.values[2];
-            float deltaX = Math.abs(last_x - x);
-            float deltaY = Math.abs(last_y - y);
-            float deltaZ = Math.abs(last_z - z);
-
-            if((deltaX > SHAKE_THRESHOLD && deltaY > SHAKE_THRESHOLD)
-                || (deltaX > SHAKE_THRESHOLD && deltaZ > SHAKE_THRESHOLD)
-                || (deltaY > SHAKE_THRESHOLD && deltaZ > SHAKE_THRESHOLD)) {
-                Log.d("SHAKE DETECTED", "SHAKE DETECTED");
-                //activity.animate(event.values[0], event.values[1], event.values[2]);
-            }
-            last_x = x;
-            last_y = y;
-            last_z = z;
-        }
-        else if(event.sensor == mMagnetometer) {
+        } else if(event.sensor == mMagnetometer) {
             System.arraycopy(event.values, 0, lastMagnetometerValues, 0, event.values.length);
             lastMagnetometerSet = true;
         }
-        else if(event.sensor == mOrient) {
-            //Using orientation sensor
-            Log.d("SENSORORIENTDETECTED", "SENSORISORIENT");
-            Log.d("SENSORORIENTDETECTED", ""+lastAccelerometerSet);
-            Log.d("SENSORORIENTDETECTED", ""+lastMagnetometerSet);
-            Log.d("SENSORORIENTDETECTED", String.valueOf(System.currentTimeMillis() - lastTimeUpdate));
-            if(lastAccelerometerSet && lastMagnetometerSet && System.currentTimeMillis() - lastTimeUpdate > 250) {
 
+        if(lastAccelerometerSet && lastMagnetometerSet && System.currentTimeMillis() - lastTimeUpdate > 250) {
             SensorManager.getRotationMatrix(rotationMatrix, null, lastAccelerometerValues, lastMagnetometerValues);
             SensorManager.getOrientation(rotationMatrix, orientationValues);
-
             float azimuthInRadians = orientationValues[0];
-            float azimuthInDegrees = (float) Math.toDegrees(azimuthInRadians + 360) % 360;
-                Log.d("SENSORORIENTDETECTED", "BEFOREROTATEACTIVITY");
-            activity.rotateCompass(azimuthInDegrees);
-            lastTimeUpdate = System.currentTimeMillis();
+            float azimuthInDegrees = (float) (Math.toDegrees(azimuthInRadians) + 360) % 360;
 
-
-            //float angleDegree = event.values[0];
-           // activity.setPictureNorth(angleDegree);
-
+            for(int i = 0; i < orientationValues.length; i++) {
+                Log.d("SENSOR", String.valueOf(orientationValues[i]));
             }
+            Log.d("SENSOR", String.valueOf(azimuthInRadians));
+            Log.d("SENSOR", String.valueOf(azimuthInDegrees));
+            /*
+            RotateAnimation rotateAnimation = new RotateAnimation(currentDegree, -azimuthInDegrees,
+                                                                    Animation.RELATIVE_TO_SELF, 0.5F,
+                                                                    Animation.RELATIVE_TO_SELF, 0.5F);
+*/
+            RotateAnimation rotateAnimation = new RotateAnimation(0, 360,
+                    Animation.RELATIVE_TO_SELF, 0.5F,
+                    Animation.RELATIVE_TO_SELF, 0.5F);
+            rotateAnimation.setDuration(250);
+            rotateAnimation.setFillAfter(true);
+            controller.startAnimation(rotateAnimation);
+            currentDegree = -azimuthInDegrees;
+            lastTimeUpdate = System.currentTimeMillis();
         }
+    }
 
-        }
+    private void rotateUsingOnlyOrientation(SensorEvent event) {
+
     }
 
     @Override
@@ -145,9 +200,11 @@ public class CompassService extends Service implements SensorEventListener {
 
     }
 
+
     public class CompassServiceBinder extends Binder {
         CompassService getService() {
             return CompassService.this;
         }
     }
+
 }

@@ -53,17 +53,13 @@ public class CompassFragment extends Fragment {
         this.compassController = compassController;
     }
 
-    public void rotateCompass(float azimuthInDegrees) {
+    public void rotateCompass(RotateAnimation rotateAnimation) {
         Log.d("ROTATE", ""+isRotating);
         if(!isRotating) {
-            Log.d("ROTATE", "ROTATE");
-            RotateAnimation rotateAnimation = new RotateAnimation(currentDegree, -azimuthInDegrees, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
-            rotateAnimation.setDuration(250);
-            rotateAnimation.setFillAfter(true);
-
+            isRotating = true;
             ivCompass.startAnimation(rotateAnimation);
-            currentDegree = -azimuthInDegrees;
         }
+        isRotating = false;
 
     }
 
